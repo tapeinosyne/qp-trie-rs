@@ -2,12 +2,22 @@
 extern crate debug_unreachable;
 extern crate unreachable;
 
+#[cfg(feature = "serde")]
+#[macro_use]
+extern crate serde;
+
 #[cfg(test)]
 #[macro_use]
 extern crate quickcheck;
 
 #[cfg(test)]
 extern crate rand;
+#[cfg(test)]
+extern crate serde_json;
+
+
+#[cfg(feature = "serde")]
+mod serialization;
 
 mod entry;
 mod iter;
@@ -32,6 +42,7 @@ mod test {
     use std::collections::HashMap;
 
     use rand::Rng;
+    use serde_json;
     use quickcheck::TestResult;
 
     use util::nybble_index;
@@ -217,6 +228,34 @@ mod test {
             });
 
             TestResult::from_bool(lcp == trie.longest_common_prefix(prefix.as_slice()))
+        }
+
+        #[cfg(feature = "serde")]
+        fn serialize(kvs: Vec<(String, usize)>) -> bool {
+            use wrapper::BString;
+
+            let original: Trie<BString, _> = kvs.into_iter().map(|(k, v)| (k.into(), v)).collect();
+            let serialized = serde_json::to_vec(&original).unwrap();
+            let deserialized: Trie<BString, usize> = serde_json::from_slice(&serialized).unwrap();
+
+            deserialized == original
+        }
+
+        #[cfg(feature = "serde")]
+        fn serialize_emptied(kvs: Vec<(String, usize)>) -> bool {
+            use wrapper::BString;
+
+            let wrap = kvs.clone().into_iter().map(|(k, v)| (BString::from(k), v));
+            let mut trie: Trie<BString, usize> = wrap.collect();
+            
+            for (k, _) in kvs {
+                trie.remove(&BString::from(k));
+            }
+
+            let serialized = serde_json::to_vec(&trie).unwrap();
+            let deserialized: Trie<BString, usize> = serde_json::from_slice(&serialized).unwrap();
+
+            deserialized == Trie::new()
         }
     }
 
@@ -428,5 +467,24 @@ mod test {
 
         println!("{}", ab_sum);
         assert_eq!(ab_sum, 5 + 6 + 50);
+    }
+
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serialize_pathological_branching() {
+        use wrapper::BString;
+
+        let kvs = (0 .. 64).map(|length| {
+            let seq = vec![0; length];
+            let k = String::from_utf8(seq).unwrap();
+            (BString::from(k), 0)
+        });
+
+        let original : Trie<BString, u8> = kvs.collect();
+        let serialized = serde_json::to_vec(&original).unwrap();
+        let deserialized: Trie<_, _> = serde_json::from_slice(&serialized).unwrap();
+
+        assert_eq!(deserialized, original);
     }
 }
