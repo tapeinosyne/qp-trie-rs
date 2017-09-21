@@ -13,7 +13,7 @@ extern crate quickcheck;
 #[cfg(test)]
 extern crate rand;
 #[cfg(test)]
-extern crate serde_json;
+extern crate bincode;
 
 
 #[cfg(feature = "serde")]
@@ -42,7 +42,7 @@ mod test {
     use std::collections::HashMap;
 
     use rand::Rng;
-    use serde_json;
+    use bincode;
     use quickcheck::TestResult;
 
     use util::nybble_index;
@@ -235,8 +235,8 @@ mod test {
             use wrapper::BString;
 
             let original: Trie<BString, _> = kvs.into_iter().map(|(k, v)| (k.into(), v)).collect();
-            let serialized = serde_json::to_vec(&original).unwrap();
-            let deserialized: Trie<BString, usize> = serde_json::from_slice(&serialized).unwrap();
+            let serialized = bincode::serialize(&original, bincode::Infinite).unwrap();
+            let deserialized: Trie<BString, usize> = bincode::deserialize(&serialized).unwrap();
 
             deserialized == original
         }
@@ -252,8 +252,8 @@ mod test {
                 trie.remove(&BString::from(k));
             }
 
-            let serialized = serde_json::to_vec(&trie).unwrap();
-            let deserialized: Trie<BString, usize> = serde_json::from_slice(&serialized).unwrap();
+            let serialized = bincode::serialize(&trie, bincode::Infinite).unwrap();
+            let deserialized: Trie<BString, usize> = bincode::deserialize(&serialized).unwrap();
 
             deserialized == Trie::new()
         }
@@ -472,6 +472,22 @@ mod test {
 
     #[test]
     #[cfg(feature = "serde")]
+    fn serialize_max_outdegree(){
+        let kvs = (0u16 .. 256).map(|b| {
+            let v = b as u8;
+            let k : Vec<_> = (0 .. 32).map(|i| (v).wrapping_add(i)).collect();
+            (k, v)
+        });
+
+        let original : Trie<Vec<u8>, u8> = kvs.collect();
+        let serialized = bincode::serialize(&original, bincode::Infinite).unwrap();
+        let deserialized: Trie<_, _> = bincode::deserialize(&serialized).unwrap();
+
+        assert_eq!(deserialized, original);
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
     fn serialize_pathological_branching() {
         use wrapper::BString;
 
@@ -482,8 +498,8 @@ mod test {
         });
 
         let original : Trie<BString, u8> = kvs.collect();
-        let serialized = serde_json::to_vec(&original).unwrap();
-        let deserialized: Trie<_, _> = serde_json::from_slice(&serialized).unwrap();
+        let serialized = bincode::serialize(&original, bincode::Infinite).unwrap();
+        let deserialized: Trie<_, _> = bincode::deserialize(&serialized).unwrap();
 
         assert_eq!(deserialized, original);
     }
