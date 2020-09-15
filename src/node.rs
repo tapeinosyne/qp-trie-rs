@@ -492,7 +492,7 @@ impl<K: Borrow<[u8]>, V> Node<K, V> {
             }
             Node::Branch(branch) => {
                 if branch.choice <= graft {
-                    mem::replace(self, Node::Branch(branch));
+                    *self =Node::Branch(branch);
                     if let Node::Branch(ref mut branch) = *self {
                         let index = branch.index(key.borrow());
 
@@ -603,7 +603,7 @@ impl<K: Borrow<[u8]>, V> Node<K, V> {
 
                         branch_mut.clear_last()
                     };
-                    mem::replace(self, node);
+                    *self = node;
                 }
 
                 Some(leaf)
@@ -666,7 +666,7 @@ impl<K: Borrow<[u8]>, V> Node<K, V> {
                 if unsafe { self.unwrap_branch_mut() }.is_singleton() {
                     // unsafe: same rationale.
                     let node = unsafe { self.unwrap_branch_mut() }.clear_last();
-                    mem::replace(self, node);
+                    *self = node;
                 }
 
                 Some(prefix_node)
@@ -688,14 +688,14 @@ impl<K: Borrow<[u8]>, V> Node<K, V> {
             Some(Node::Branch(..))
                 // unsafe: root has been matched as some branch.
                 if unsafe { root.as_ref().unchecked_unwrap().unwrap_branch_ref() }
-                       
+
                        .get_exemplar(prefix)
                        .key_slice()
                        .starts_with(prefix) => {
 
                 // unsafe: same rationale.
                 if unsafe { root.as_ref().unchecked_unwrap().unwrap_branch_ref() }
-                    
+
                     .choice >= prefix.len() * 2
                 {
                     root.take()
